@@ -118,9 +118,9 @@ type alias KieServerConfigItem =
 kieServerConfigItemDecoder : Decoder KieServerConfigItem
 kieServerConfigItemDecoder =
     Decode.map3 KieServerConfigItem
-        (Decode.field "name" Decode.string)
-        (Decode.field "value" Decode.string)
-        (Decode.field "type" Decode.string)
+        (Decode.field "itemName" Decode.string)
+        (Decode.field "itemValue" Decode.string)
+        (Decode.field "itemType" Decode.string)
 
 
 
@@ -136,10 +136,14 @@ type alias KieServerStateInfo =
 
 kieServerStateInfoDecoder : Decoder KieServerStateInfo
 kieServerStateInfoDecoder =
-    Decode.map3 KieServerStateInfo
-        (Decode.field "controller" <| Decode.list Decode.string)
-        (Decode.field "config" kieServerConfigDecoder)
-        (Decode.field "containers" <| Decode.list kieContainerResourceDecoder)
+    let
+        kieServerStateInfoObjectDecoder =
+            Decode.map3 KieServerStateInfo
+                (Decode.field "controller" <| Decode.list Decode.string)
+                (Decode.field "config" <| Decode.field "config-items" kieServerConfigDecoder)
+                (Decode.field "containers" <| Decode.list kieContainerResourceDecoder)
+    in
+        Decode.field "kie-server-state-info" kieServerStateInfoObjectDecoder
 
 
 
@@ -165,7 +169,7 @@ type alias KieContainerResource =
     , release_id : ReleaseId
     , resolved_releaseId : ReleaseId
     , status : KieContainerStatus
-    , scanner : KieScannerResource
+    , scanner : Maybe KieScannerResource
     , config_items : List KieServerConfigItem
     , messages : List Message
     , container_alias : String
@@ -174,15 +178,34 @@ type alias KieContainerResource =
 
 kieContainerResourceDecoder : Decoder KieContainerResource
 kieContainerResourceDecoder =
-    Debug.crash "implement kieContainerResourceDecoder"
+    Decode.map8 KieContainerResource
+        (Decode.field "container-id" Decode.string)
+        (Decode.field "release-id" releaseIdDecoder)
+        (Decode.field "resolved-release-id" releaseIdDecoder)
+        (Decode.field "status" kieContainerStatusDecoder)
+        (Decode.maybe <| Decode.field "scanner" kieScannerResourceDecoder)
+        (Decode.field "config-items" <| Decode.list kieServerConfigItemDecoder)
+        (Decode.field "messages" <| Decode.list messageDecoder)
+        (Decode.field "container-alias" <| Decode.string)
 
 
 
 -- org.kie.server.api.mode.ReleaseId
 
 
-type ReleaseId
-    = ReleaseId --TODO
+type alias ReleaseId =
+    { group_id : String
+    , artifact_id : String
+    , version : String
+    }
+
+
+releaseIdDecoder : Decoder ReleaseId
+releaseIdDecoder =
+    Decode.map3 ReleaseId
+        (Decode.field "group-id" Decode.string)
+        (Decode.field "artifact-id" Decode.string)
+        (Decode.field "version" Decode.string)
 
 
 
@@ -213,8 +236,17 @@ kieContainerStatusDecoder =
 -- org.kie.server.api.model.KieScannerResource
 
 
-type KieScannerResource
-    = KieScannerResource --TODO
+type alias KieScannerResource =
+    { kieStannerStatus : KieScannerStatus
+    , pollInterval : Int
+    }
+
+
+kieScannerResourceDecoder : Decoder KieScannerResource
+kieScannerResourceDecoder =
+    Decode.map2 KieScannerResource
+        (Decode.field "status" kieScannerStatusDecoder)
+        (Decode.field "poll-interval" Decode.int)
 
 
 

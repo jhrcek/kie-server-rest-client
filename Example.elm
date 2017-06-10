@@ -3,7 +3,9 @@ module Example exposing (..)
 import Html exposing (..)
 import Html.Events exposing (..)
 import Http
-import KieServer.Types as KS exposing (ServiceResponse, KieServerInfo)
+import KieServer.Types as KS exposing (..)
+import KieServer.Urls as Url
+import Json.Decode as Decode exposing (Decoder)
 
 
 main : Program Never Model Msg
@@ -28,7 +30,7 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     ( Model "Initializing"
-    , executionServerInfo
+    , kieServerStateInfo
     )
 
 
@@ -38,16 +40,24 @@ init =
 
 type Msg
     = Reload
-    | DataArrived (Result Http.Error (ServiceResponse KieServerInfo))
+    | KieServerInfoArrived (ServiceResponseResult KieServerInfo)
+    | KieServerStateInfoArrived (ServiceResponseResult KieServerStateInfo)
+
+
+type alias ServiceResponseResult a =
+    Result Http.Error (ServiceResponse a)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Reload ->
-            ( model, executionServerInfo )
+            ( model, kieServerStateInfo )
 
-        DataArrived result ->
+        KieServerInfoArrived result ->
+            ( { model | response = toString result }, Cmd.none )
+
+        KieServerStateInfoArrived result ->
             ( { model | response = toString result }, Cmd.none )
 
 
@@ -73,20 +83,25 @@ subscriptions model =
     Sub.none
 
 
-executionServerInfo : Cmd Msg
-executionServerInfo =
-    Http.send DataArrived <| makeRequest "/kie-execution-server/services/rest/server"
+kieServerInfo : Cmd Msg
+kieServerInfo =
+    Http.send KieServerInfoArrived <| makeRequest Url.base (KS.serviceResponseDecoder KS.kieServerInfoDecoder)
 
 
-makeRequest : String -> Http.Request (ServiceResponse KieServerInfo)
-makeRequest apiUrl =
+kieServerStateInfo : Cmd Msg
+kieServerStateInfo =
+    Http.send KieServerStateInfoArrived <| makeRequest Url.serverState (KS.serviceResponseDecoder KS.kieServerStateInfoDecoder)
+
+
+makeRequest : String -> Decoder a -> Http.Request a
+makeRequest apiUrl decoder =
     Http.request
         { method = "GET"
         , headers =
             [ Http.header "Content-Type" "application/json" ]
         , url = apiUrl
         , body = Http.emptyBody
-        , expect = Http.expectJson (KS.serviceResponseDecoder KS.kieServerInfoDecoder)
+        , expect = Http.expectJson decoder
         , timeout = Nothing
         , withCredentials = False
         }
