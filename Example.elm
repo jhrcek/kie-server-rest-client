@@ -1,20 +1,21 @@
-module Example exposing (..)
+module Example exposing (Model, Msg(..), ServiceResponseResult, init, main, makeRequest, request_kieServerInfo, request_kieServerStateInfo, update, view)
 
+import Browser
 import Html exposing (..)
 import Html.Events exposing (..)
 import Http
+import Json.Decode as Decode exposing (Decoder)
 import KieServer.Types as KS exposing (..)
 import KieServer.Urls as Url
-import Json.Decode as Decode exposing (Decoder)
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , view = view
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = always Sub.none
         }
 
 
@@ -27,10 +28,10 @@ type alias Model =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init () =
     ( Model "Initializing"
-    , kieServerStateInfo
+    , request_kieServerStateInfo
     )
 
 
@@ -39,7 +40,8 @@ init =
 
 
 type Msg
-    = Reload
+    = Request_KieServerInfo
+    | Request_KieServerStateInfo
     | KieServerInfoArrived (ServiceResponseResult KieServerInfo)
     | KieServerStateInfoArrived (ServiceResponseResult KieServerStateInfo)
 
@@ -51,14 +53,17 @@ type alias ServiceResponseResult a =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Reload ->
-            ( model, kieServerStateInfo )
+        Request_KieServerInfo ->
+            ( model, request_kieServerStateInfo )
+
+        Request_KieServerStateInfo ->
+            ( model, request_kieServerInfo )
 
         KieServerInfoArrived result ->
-            ( { model | response = toString result }, Cmd.none )
+            ( { model | response = Debug.toString result }, Cmd.none )
 
         KieServerStateInfoArrived result ->
-            ( { model | response = toString result }, Cmd.none )
+            ( { model | response = Debug.toString result }, Cmd.none )
 
 
 
@@ -68,29 +73,21 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ button [ onClick Reload ] [ text "Reload" ]
+        [ button [ onClick Request_KieServerInfo ] [ text "Request KieServerInfo" ]
+        , button [ onClick Request_KieServerStateInfo ] [ text "Request KieServerStateInfo" ]
         , br [] []
         , div [] [ text "Response from the server:", text model.response ]
         ]
 
 
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
+request_kieServerInfo : Cmd Msg
+request_kieServerInfo =
+    Http.send KieServerInfoArrived <| makeRequest Url.base <| KS.serviceResponseDecoder KS.kieServerInfoDecoder
 
 
-kieServerInfo : Cmd Msg
-kieServerInfo =
-    Http.send KieServerInfoArrived <| makeRequest Url.base (KS.serviceResponseDecoder KS.kieServerInfoDecoder)
-
-
-kieServerStateInfo : Cmd Msg
-kieServerStateInfo =
-    Http.send KieServerStateInfoArrived <| makeRequest Url.serverState (KS.serviceResponseDecoder KS.kieServerStateInfoDecoder)
+request_kieServerStateInfo : Cmd Msg
+request_kieServerStateInfo =
+    Http.send KieServerStateInfoArrived <| makeRequest Url.serverState <| KS.serviceResponseDecoder KS.kieServerStateInfoDecoder
 
 
 makeRequest : String -> Decoder a -> Http.Request a

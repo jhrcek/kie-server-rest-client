@@ -1,8 +1,39 @@
-module KieServer.Types exposing (..)
+module KieServer.Types exposing
+    ( KieContainerResource
+    , KieContainerStatus(..)
+    , KieScannerResource
+    , KieScannerStatus(..)
+    , KieServerConfig
+    , KieServerConfigItem
+    , KieServerInfo
+    , KieServerStateInfo
+    , Message(..)
+    , ReleaseId
+    , ResponseType(..)
+    , ServiceResponse
+    , Severity(..)
+    , decoderFromDict
+    , kieContainerResourceDecoder
+    , kieContainerStatusDecoder
+    , kieScannerResourceDecoder
+    , kieScannerStatusDecoder
+    , kieServerConfigDecoder
+    , kieServerConfigItemDecoder
+    , kieServerInfoDecoder
+    , kieServerStateInfoDecoder
+    , makeUnionDecoder
+    , messageDecoder
+    , releaseIdDecoder
+    , responseTypeDecoder
+    , serviceResponseDecoder
+    , severityDecoder
+    , timestampDecoder
+    )
 
-import Date exposing (Date)
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
+import Time exposing (Posix)
+
 
 
 -- org.kie.server.api.model.ServiceResponse
@@ -64,7 +95,7 @@ kieServerInfoDecoder =
                 (Decode.field "capabilities" (Decode.list Decode.string))
                 (Decode.field "messages" (Decode.list messageDecoder))
     in
-        Decode.field "kie-server-info" kieServerInfoObjectDecoder
+    Decode.field "kie-server-info" kieServerInfoObjectDecoder
 
 
 
@@ -72,21 +103,20 @@ kieServerInfoDecoder =
 
 
 type Message
-    = Message Severity Date (List String)
+    = Message Severity Posix (List String)
 
 
 messageDecoder : Decoder Message
 messageDecoder =
     Decode.map3 Message
         (Decode.field "severity" severityDecoder)
-        (Decode.field "timestamp" dateDecoder)
+        (Decode.field "timestamp" timestampDecoder)
         (Decode.field "content" (Decode.list Decode.string))
 
 
-dateDecoder : Decoder Date
-dateDecoder =
-    Decode.field "java.util.Date" Decode.float
-        |> Decode.map Date.fromTime
+timestampDecoder : Decoder Posix
+timestampDecoder =
+    Decode.map Time.millisToPosix <| Decode.field "java.util.Date" Decode.int
 
 
 
@@ -143,7 +173,7 @@ kieServerStateInfoDecoder =
                 (Decode.field "config" <| Decode.field "config-items" kieServerConfigDecoder)
                 (Decode.field "containers" <| Decode.list kieContainerResourceDecoder)
     in
-        Decode.field "kie-server-state-info" kieServerStateInfoObjectDecoder
+    Decode.field "kie-server-state-info" kieServerStateInfoObjectDecoder
 
 
 
@@ -287,10 +317,11 @@ decoderFromDict dict =
 makeUnionDecoder : Dict String a -> String -> Decoder a
 makeUnionDecoder strToValDict strToParse =
     Dict.get strToParse strToValDict
-        |> \maybeVal ->
-            case maybeVal of
-                Nothing ->
-                    Decode.fail <| "Unexpected response type: '" ++ strToParse ++ "' - expected one of " ++ (toString <| Dict.keys strToValDict)
+        |> (\maybeVal ->
+                case maybeVal of
+                    Nothing ->
+                        Decode.fail <| "Unexpected response type: '" ++ strToParse ++ "' - expected one of " ++ (String.join "," <| Dict.keys strToValDict)
 
-                Just val ->
-                    Decode.succeed val
+                    Just val ->
+                        Decode.succeed val
+           )

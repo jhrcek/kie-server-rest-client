@@ -1,4 +1,4 @@
-module KieServer.Urls exposing (..)
+module KieServer.Urls exposing (base, serverState)
 
 
 base : String
